@@ -1,0 +1,465 @@
+{
+  pkgs,
+  config,
+  lib,
+  inputs,
+  ...
+}: {
+  home.packages = with pkgs; [
+    wlogout
+    yad
+    psmisc
+    pamixer
+    libnotify
+    brightnessctl
+    wl-clipboard
+    cliphist
+    wlroots
+    slurp
+    hyprpicker
+    imagemagick
+    grim
+    swaylock-effects
+    # hyprpolkitagent
+    gpustat
+    hyprpanel #inputs.hyprpanel.packages.${pkgs.system}.default
+    ags
+    #plugins
+    # hyprlandPlugins.hyprspace
+    nwg-dock-hyprland
+
+    #NOTE: Multi monitor pkg.
+    hyprsome
+
+    #NOTE: For screenshot script.
+    slop
+    ffcast
+    xclip
+    xdg-user-dirs
+  ];
+
+  wayland.windowManager.hyprland = {
+    enable = true;
+    systemd.enable = false; #FIXME: Does not work properly, Enabled this because i want to try it.
+    systemd.variables = ["--all"];
+    plugins = [
+      # pkgs.hyprlandPlugins.split-monitor-workspaces
+      # inputs.hyprland-plugins.packages.${pkgs.system}.hyprbars
+      # inputs.hyprland-plugins.packages.${pkgs.system}.hyprexpo
+      # inputs.hycov.packages.${pkgs.system}.hycov
+      inputs.split-monitor-workspaces.packages.${pkgs.system}.split-monitor-workspaces
+    ];
+    settings = {
+      # Scripts
+      "$mod" = "SUPER";
+      "$GameMode" = "~/.config/hypr/scripts/GameMode";
+      # "$LockScreen" = "~/.config/hypr/scripts/LockScreen";
+      # "$Volume" = "~/.config/hypr/scripts/Volume";
+      "$backlight" = "~/.config/hypr/scripts/Brightness";
+      "$term" = "~/.config/hypr/scripts/Terminal";
+      "$launcher" = "~/.config/hypr/rofi/bin/launcher";
+      "$powermenu" = "~/.config/hypr/rofi/bin/powermenu";
+      "$screenshot" = "~/.config/hypr/rofi/bin/screenshot";
+      "$colorpicker" = "~/.config/hypr/scripts/colorpicker";
+
+      plugin = {
+        split-monitor-workspaces = {
+          count = 5;
+          keep_focused = 0;
+          enable_notifications = 0;
+          enable_persistent_workspaces = 1;
+        };
+      };
+      monitor = [
+        "eDP-1,1920x1080@60,0x0,1"
+        # "DP-1,transform,1"
+        # "workspace=eDP-1,1"
+
+        # HDMI Monitor setup
+        "HDMI-A-1,1920x1080@60,1920x0,1"
+        # "workspace=HDMI-A-1,11"
+
+        "Unknown-1,disable"
+      ];
+
+      xwayland = {
+        force_zero_scaling = true;
+      };
+
+      decoration = {
+        rounding = 10;
+        blur = {
+          enabled = false;
+          size = 7;
+          passes = 1;
+          new_optimizations = true;
+          xray = false; # Don't blur behind transparent windows
+          ignore_opacity = false; # Respect window opacity for blur
+        };
+      };
+
+      input = {
+        kb_layout = "us";
+        kb_variant = ",qwerty";
+        kb_model = "";
+        kb_options = "";
+        kb_rules = "";
+
+        follow_mouse = 1;
+        repeat_delay = 140;
+        repeat_rate = 30;
+        numlock_by_default = true;
+        accel_profile = "flat";
+        sensitivity = 0;
+        force_no_accel = 1;
+        touchpad = {
+          natural_scroll = 1;
+        };
+      };
+
+      cursor = {
+        enable_hyprcursor = true;
+      };
+
+      gestures = {
+        workspace_swipe = 1;
+        workspace_swipe_fingers = 3;
+        workspace_swipe_distance = 200;
+        workspace_swipe_min_speed_to_force = 100;
+      };
+
+      render = {
+        # Enables explicit sync support.
+        explicit_sync = 1;
+      };
+
+      debug = {
+        damage_tracking = 2; # leave it on 2 (full) unless you hate your GPU and want to make it suffer!
+      };
+
+      animations = {
+        enabled = true;
+        bezier = [
+          "pace,0.46, 1, 0.29, 0.99"
+          "overshot,0.13,0.99,0.29,1.1"
+          "md3_decel, 0.05, 0.7, 0.1, 1"
+        ];
+        animation = [
+          "windowsIn,1,6,md3_decel,slide"
+          "windowsOut,1,6,md3_decel,slide"
+          "windowsMove,1,6,md3_decel,slide"
+          "fade,1,10,md3_decel"
+          "workspaces,1,9,md3_decel,slide"
+          "workspaces, 1, 6, default"
+          "specialWorkspace,1,8,md3_decel,slide"
+          "border,1,10,md3_decel"
+        ];
+      };
+
+      misc = {
+        vfr = true; # misc:no_vfr -> misc:vfr. bool, heavily recommended to leave at default on. Saves on CPU usage.
+        vrr = 0; # misc:vrr -> Adaptive sync of your monitor. 0 (off), 1 (on), 2 (fullscreen only). Default 0 to avoid white flashes on select hardware.
+        disable_hyprland_logo = true;
+        disable_splash_rendering = true;
+      };
+
+      dwindle = {
+        pseudotile = true; # enable pseudotiling on dwindle
+        force_split = 0;
+        preserve_split = true;
+        default_split_ratio = 1.0;
+        # no_gaps_when_only = false;
+        special_scale_factor = 0.8;
+        split_width_multiplier = 1.0;
+        use_active_for_splits = true;
+      };
+
+      master = {
+        mfact = 0.5;
+        orientation = "right";
+        special_scale_factor = 0.8;
+        new_status = "slave";
+        # no_gaps_when_only = false;
+      };
+
+      bind = [
+        # Hyprland binds
+        # Kill Active window. Whatever is front of you.
+        "SUPER,C,killactive,"
+        "SUPERSHIFT,Q,exec,hyprctl dispatch exit"
+        #"SUPERSHIFT,Q,exec,uwsm stop"
+
+        # GameMode
+        "SUPER,F1,exec, $GameMode"
+
+        # lockScreen
+        # "CTRLALT,l,exec, ~/.config/hypr/scripts/LockScreen"
+
+        "CTRLALT,l,exec, hyprlock"
+
+        # FLoat window
+        "SUPER,F,fullscreen,"
+        "SUPER,SPACE,togglefloating, active"
+
+        # CycleNext
+        "SUPER,TAB,cyclenext,"
+        "SUPER,TAB,bringactivetotop,"
+
+        # Screenlock
+        "CTRLALT,L,exec,$screenlock"
+
+        # ZOOM
+        "SUPER,grave,exec,pypr zoom"
+
+        # Focus
+        "SUPER,left,movefocus,l"
+        "SUPER,right,movefocus,r"
+        "SUPER,up,movefocus,u"
+        "SUPER,down,movefocus,d"
+
+        # Move
+        "SUPERSHIFT,left,movewindow,l"
+        "SUPERSHIFT,right,movewindow,r"
+        "SUPERSHIFT,up,movewindow,u"
+        "SUPERSHIFT,down,movewindow,d"
+
+        # Resize
+        "SUPERCTRL,left,resizeactive,-20 0"
+        "SUPERCTRL,right,resizeactive,20 0"
+        "SUPERCTRL,up,resizeactive,0 -20"
+        "SUPERCTRL,down,resizeactive,0 20"
+
+        # Workspaces
+        "SUPER,1,workspace,1"
+        "SUPER,2,workspace,2"
+        "SUPER,3,workspace,3"
+        "SUPER,4,workspace,4"
+        "SUPER,5,workspace,5"
+        "SUPER,6,workspace,6"
+        "SUPER,7,workspace,7"
+        "SUPER,8,workspace,8"
+        "SUPER,9,workspace,9"
+        # SUPER,0,workspace,0
+
+        # Send to Workspaces
+        "SUPERSHIFT,1,movetoworkspace,1"
+        "SUPERSHIFT,2,movetoworkspace,2"
+        "SUPERSHIFT,3,movetoworkspace,3"
+        "SUPERSHIFT,4,movetoworkspace,4"
+        "SUPERSHIFT,5,movetoworkspace,5"
+        "SUPERSHIFT,6,movetoworkspace,6"
+        "SUPERSHIFT,7,movetoworkspace,7"
+        "SUPERSHIFT,8,movetoworkspace,8"
+        "SUPERSHIFT,9,movetoworkspace,9"
+        # ",0,movetoworkspace,0"
+
+        #         # workspace -> split-workspace
+        # "SUPER, 1, split-workspace, 1"
+        # "SUPER, 2, split-workspace, 2"
+        # "SUPER, 3, split-workspace, 3"
+        # "SUPER, 4, split-workspace, 4"
+        # "SUPER, 5, split-workspace, 5"
+        # "SUPER, 6, split-workspace, 6"
+        # "SUPER, 7, split-workspace, 7"
+        # "SUPER, 8, split-workspace, 8"
+        # "SUPER, 9, split-workspace, 9"
+        # "SUPERSHIFT, H, workspace, -1"
+        # "SUPERSHIFT, L, workspace, +1"
+        # "SUPERCTRL, h, movetoworkspace, -1"
+        # "SUPERCTRL, l, movetoworkspace, +1"
+        # "SUPERSHIFT_CTRL, h, movetoworkspacesilent, -1"
+        # "SUPERSHIFT_CTRL, l, movetoworkspacesilent, +1"
+        # # bind = SUPER, TAB, exec, hyprctl dispatch workspace $(hyprctl -j monitors | jaq -r '.[] | select(.focused == true) | .activeWorkspace.id')
+        # # movetoworkspace -> split-movetoworkspace
+        # "SUPERSHIFT, 1, split-movetoworkspace, 1"
+        # "SUPERSHIFT, 2, split-movetoworkspace, 2"
+        # "SUPERSHIFT, 3, split-movetoworkspace, 3"
+        # "SUPERSHIFT, 4, split-movetoworkspace, 4"
+        # "SUPERSHIFT, 5, split-movetoworkspace, 5"
+        # "SUPERSHIFT, 6, split-movetoworkspace, 6"
+        # "SUPERSHIFT, 7, split-movetoworkspace, 7"
+        # "SUPERSHIFT, 8, split-movetoworkspace, 8"
+        # "SUPERSHIFT, 9, split-movetoworkspace, 9"
+        # "SUPERSHIFT, 0, split-movetoworkspace, 10"
+        # # movetoworkspacesilent -> split-movetoworkspacesilent
+        # "SUPERSHIFT_CTRL, 1, split-movetoworkspacesilent, 1"
+        # "SUPERSHIFT_CTRL, 2, split-movetoworkspacesilent, 2"
+        # "SUPERSHIFT_CTRL, 3, split-movetoworkspacesilent, 3"
+        # "SUPERSHIFT_CTRL, 4, split-movetoworkspacesilent, 4"
+        # "SUPERSHIFT_CTRL, 5, split-movetoworkspacesilent, 5"
+        # "SUPERSHIFT_CTRL, 6, split-movetoworkspacesilent, 6"
+        # "SUPERSHIFT_CTRL, 7, split-movetoworkspacesilent, 7"
+        # "SUPERSHIFT_CTRL, 8, split-movetoworkspacesilent, 8"
+        # "SUPERSHIFT_CTRL, 9, split-movetoworkspacesilent, 9"
+        # "SUPERSHIFT_CTRL, 0, split-movetoworkspacesilent, 10"
+
+        # Scroll through existing workspaces with mainMod + scroll
+        "SUPER,mouse_down,workspace,e+1"
+        "SUPER,mouse_up,workspace,e-1"
+
+        # -- Rofi --
+        # "SUPER,D,exec,$launcher"
+        "SUPER,D,exec,sh ~/.config/hypr/rofi/bin/launcher"
+        "SUPERSHIFT,C,exec,sh ~/.config/hypr/rofi/bin/clipboard"
+        "SUPER,X,exec,sh ~/.config/hypr/rofi/bin/powermenu"
+        "SUPER,S,exec,sh ~/.config/hypr/rofi/bin/screenshot"
+
+        #FIXME:, Have to fix those.
+        # "SUPERSHIFT,C,exec,$clipboard"
+        # "SUPER,X,exec,$powermenu"
+        # "SUPER,S,exec,$screenshot"
+
+        # Waybar
+        # "SUPER, B, exec, pkill -SIGUSR1 waybar"
+        # "SUPERSHIFT, B, exec, pkill -SIGUSR1 waybar && $GameMode"
+
+        # -- Apps --
+        "SUPERSHIFT,F,exec,nemo"
+        "SUPERSHIFT,W,exec,vivaldi"
+        # "SUPERSHIFT,E,exec,geany"
+        # -- Terminal --
+        # bind=SUPER,RETURN,exec,$term
+        # SUPERSHIFT,RETURN,exec,$term -f
+        # SUPER,RETURN,exec,$term
+        # "SUPER,RETURN,exec,kitty"
+        # "SUPERSHIFT,RETURN,exec,$term -f"
+        "SUPERSHIFT,RETURN,exec, kitty --class=kitty-float"
+        "SUPER,RETURN,exec,$term"
+        # bind=SUPER,RETURN,exec,alacritty
+      ];
+      exec-once = [
+        # "easyeffects --gapplication-service" # Starts easyeffects in the background
+        # "importGsettings"
+        # "zen"
+        # "vivaldi"
+        "wpaperd"
+        # "beeper"
+        # "appimage-run AppImages/beeper.appimage --ozone-platform-hint=auto --enable-wayland-ime --enable-features=TouchpadOverscrollHistoryNavigation --wayland-text-input-version=3" #NOTE: This this for running appimage of the beeper on startup.
+        # "okular"
+        # "discord"
+        # "rambox"
+        # "appimage-run AppImages/rambox.appimage" #BUG: "Have gpu/cpu issue which cause lag" #NOTE; This is for runnning the appimage of the rambox on startup.
+        "nemo"
+        # "~/.config/hypr/scripts/StatusBar"
+        # "virt-manager"
+        # "fcitx5 -d"
+        "hyprshade on vibrance" #FIXME:, For some reason this dosn't work with the hyprshade install.
+        "pypr"
+        #"nwg-dock-hyprland -d"
+        # "dbus-update-activation-environment --systemd HYPRLAND_INSTANCE_SIGNATURE"
+
+        # System
+        # "systemctl --user import-environment &"
+        # "hash dbus-update-activation-environment 2>/dev/null &"
+        # "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP &"
+        "dbus-update-activation-environment --systemd --all"
+        # "poweralertd &"
+        # "systemctl --user start hyprpolkitagent&"
+        # "${pkgs.hyprpanel}/bin/hyprpanel"
+        "hyprpanel"
+        "fcitx5 -d # not ${pkgs.fcitx5}/bin/fcitx5 !"
+      ];
+      # Mouse binds
+      bindm = [
+        "SUPER,mouse:272,movewindow"
+        "SUPER,mouse:273,resizewindow"
+      ];
+      bindl = [
+        ", XF86AudioPlay, exec, playerctl play-pause"
+        ", XF86AudioNext, exec, playerctl next"
+        ", XF86AudioPrev, exec, playerctl previous"
+
+        ", XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+        ", XF86AudioLowerVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+        ", XF86AudioRaiseVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+
+        # ", XF86AudioLowerVolume, exec, $volume --inc"
+        # ", XF86AudioRaiseVolume, exec, $volume --dec"
+
+        # ", XF86MonBrightnessUp,  exec, brightnessctl s +5%"
+        # ", XF86MonBrightnessDown,  exec, brightnessctl s 5%-"
+
+        # ", XF86MonBrightnessUp,  exec, $backlight --inc "
+        # ", XF86MonBrightnessDown,  exec, $backlight --dec "
+
+        ", XF86MonBrightnessUp,  exec, brightnessctl set 10+"
+        ", XF86MonBrightnessDown,  exec, brightnessctl set 10-"
+      ];
+      windowrule = [
+        # "float, file_progress"
+        # "float, confirm"
+        # "float, dialog"
+        # "float, download"
+        # -- Kitty --
+        # "opacity 0.8,kitty"
+        # "float,kitty_float"
+        # "size 70% 60%,kitty_float"
+        # "center,kitty_float"
+      ];
+      windowrulev2 = [
+        "float,class:^(org.gnome.FileRoller)$"
+        "center,class:^(org.gnome.FileRoller)$"
+        "size 450 250,class:^(org.gnome.FileRoller)$"
+
+        "float, class:(kitty-float)"
+        "center, class:(kitty-float)"
+        "size 80% 70%, class:(kitty-float)"
+
+        "opacity 0.8 0.8,class:^(kitty)$"
+
+        "workspace 1 ,opacity 1.0,class:(kitty)"
+        "workspace 6 silent,class:(virt-manager)"
+        "workspace 2 ,class:(vivaldi-stable)"
+        "workspace 3 silent,class:(nemo)"
+        "workspace 4 silent,class:(Beeper)"
+        "workspace 4 silent,opacity 1.0,class:(zen-alpha)"
+        # "workspace 6 silent,class:(beepertexts)"
+        "workspace 4 ,class:(discord)"
+        "workspace 9 silent,class:(rambox)"
+        "workspace 3 ,class:(mpv)"
+
+        # Fullscreen
+        # "fullscreen,class:(mpv)"
+        # "fullscreen,class:(com.stremio.stremio)"
+
+        # Bottles floating configuration
+        "float, class:(com.usebottles.bottles)"
+        "center, class:(com.usebottles.bottles)"
+        "size 80% 70%, class:(com.usebottles.bottles)" # Percentage-based sizing
+        "minsize 800 600, class:(com.usebottles.bottles)"
+        "maxsize 1400 1000, class:(com.usebottles.bottles)"
+
+        # Animation for smooth appearance
+        "animation slideIn, class:(com.usebottles.bottles)"
+
+        # Optional: Make it slightly transparent
+        "opacity 0.98, class:(com.usebottles.bottles)"
+      ];
+      env = [
+        "XDG_SESSION_TYPE,wayland"
+        "XDG_CURRENT_DESKTOP,Hyprland"
+        "MOZ_ENABLE_WAYLAND,1"
+        # "ANKI_WAYLAND,1"
+        # "DISABLE_QT5_COMPAT,0"
+        "NIXOS_OZONE_WL,1"
+        "XDG_SESSION_TYPE,wayland"
+        "XDG_SESSION_DESKTOP,Hyprland"
+        # "QT_AUTO_SCREEN_SCALE_FACTOR,1"
+        "QT_QPA_PLATFORM=wayland,xcb"
+        # "QT_WAYLAND_DISABLE_WINDOWDECORATION,1"
+        "ELECTRON_OZONE_PLATFORM_HINT,auto"
+        # "GTK_THEME,FlatColor:dark"
+        # "GTK2_RC_FILES,/home/hadi/.local/share/themes/FlatColor/gtk-2.0/gtkrc"
+        "DISABLE_QT5_COMPAT,0"
+        "DIRENV_LOG_FORMAT,"
+        # "WLR_DRM_NO_ATOMIC,1"
+        "WLR_BACKEND,vulkan"
+        "WLR_RENDERER,vulkan"
+        # "WLR_NO_HARDWARE_CURSORS,1"
+        "XDG_SESSION_TYPE,wayland"
+        "SDL_VIDEODRIVER,wayland"
+        "CLUTTER_BACKEND,wayland"
+      ];
+    };
+  };
+}
