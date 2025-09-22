@@ -5,6 +5,7 @@
     ./battery.nix
     ./power.nix
     ./tweaks.nix
-    ./impermanence.nix
+    #./impermanence.nix
+    ./nuke-impermanence.nix
   ];
 }

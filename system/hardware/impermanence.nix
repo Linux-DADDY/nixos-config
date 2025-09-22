@@ -21,7 +21,6 @@ in {
     enable = true;
     hideMounts = true;
     directories = [
-      "/etc/nixos"
       "/etc/NetworkManager/system-connections"
       "/var/lib/nixos"
       "/var/lib/systemd/coredump"
