@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="$HOME/Documents/nixos"
+REPO="$HOME/Documents/nixos-config/"
 cd "$REPO"
 
 # Generate branch name: backup-YYYY-MM-DD-HHMM
