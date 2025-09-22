@@ -4,10 +4,13 @@ set -euo pipefail
 REPO="$HOME/Documents/nixos-config/"
 cd "$REPO"
 
-# Generate branch name: backup-YYYY-MM-DD-HHMM
+# Store current branch name
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Generate backup branch name: backup-YYYY-MM-DD-HHMM
 BRANCH="backup-$(date +%Y-%m-%d-%H%M)"
 
-# Optional: Check if branch already exists (unlikely, but safe)
+# Check if branch already exists
 if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
   echo "⚠️ Branch $BRANCH already exists. Appending seconds to avoid collision."
   BRANCH="backup-$(date +%Y-%m-%d-%H%M%S)"
@@ -23,8 +26,8 @@ if git diff-index --quiet HEAD --; then
   exit 0
 fi
 
-# Create new branch from current main
-echo "🌿 Creating branch: $BRANCH"
+# Create new backup branch from current state
+echo "🌿 Creating backup branch: $BRANCH"
 git checkout -b "$BRANCH"
 
 # Commit
@@ -35,8 +38,9 @@ git commit -m "Auto-backup: $(date)"
 echo "🚀 Pushing branch $BRANCH to origin..."
 git push -u origin "$BRANCH"
 
-# Switch back to main
-echo "🔙 Switching back to main..."
-git checkout main
+# IMPORTANT: Return to original working branch
+echo "🔙 Returning to original branch: $CURRENT_BRANCH"
+git checkout "$CURRENT_BRANCH"
 
 echo "✅ Backup complete! Branch: $BRANCH"
+echo "💡 You are back on your working branch: $CURRENT_BRANCH"
