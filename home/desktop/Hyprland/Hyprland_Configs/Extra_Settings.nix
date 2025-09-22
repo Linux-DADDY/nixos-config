@@ -23,17 +23,17 @@
       enable_hyprcursor = true;
     };
 
-    gestures = {
-      workspace_swipe = 1;
-      workspace_swipe_fingers = 3;
-      workspace_swipe_distance = 200;
-      workspace_swipe_min_speed_to_force = 100;
-    };
+    #gestures = {
+    # workspace_swipe = 1;
+    # workspace_swipe_fingers = 3;
+    # workspace_swipe_distance = 200;
+    # workspace_swipe_min_speed_to_force = 100;
+    #};
 
-    render = {
-      # Enables explicit sync support.
-      explicit_sync = 1;
-    };
+    #render = {
+    # # Enables explicit sync support.
+    # explicit_sync = 1;
+    #};
 
     debug = {
       damage_tracking = 2; # leave it on 2 (full) unless you hate your GPU and want to make it suffer!

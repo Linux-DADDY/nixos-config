@@ -67,11 +67,19 @@
   programs.command-not-found.enable = true;
 
   # Freefall
-  services.freefall = {
+  #services.freefall = {
+  # enable = true;
+  #devices = [
+  # "/dev/sda"
+  #];
+  # };
+
+  # Yet another nix helper
+  programs.nh = {
     enable = true;
-    #devices = [
-    # "/dev/sda"
-    #];
+    clean.enable = true;
+    clean.extraArgs = "--keep-since 4d --keep 3";
+    flake = "/home/${declarative.username}/Documents/nixos-config/"; # sets NH_OS_FLAKE variable for you
   };
 
   # Enable flakes and new nix command
