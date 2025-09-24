@@ -21,7 +21,7 @@
       "video" # Graphics/gpu access
       "audio" # Sound/audio access
     ];
-    # shell = pkgs.zsh; # Uncomment to set Zsh as default shell
+    shell = pkgs.zsh; # Uncomment to set Zsh as default shell
 
     # Set hashed password (generate with 'mkpasswd -m sha-512')
     hashedPassword = "$6$PNWox50JI/pX0bbG$v1vg5cKfyAxTZ8vtSO8JahMBb1L72XgOePn0sNVKSsc1LjZ3mQaGGVQiEMUdpjnjQ6YzWRg5KkssXZwir34pQ/";
@@ -34,6 +34,9 @@
     #   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... your-public-key-here"
     # ];
   };
+
+  # To enable zsh.
+  programs.zsh.enable = true;
 
   # Optional: Enable immutable users for reproducibility
   # users.mutableUsers = false; # Prevents manual user changes outside Nix

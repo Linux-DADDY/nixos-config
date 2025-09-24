@@ -6,142 +6,72 @@
 }: let
   persistPath = declarative.persistPath;
 
-  # Btrfs-based nuke script that recreates subvolumes for true impermanence
-  nukeScript = pkgs.writeShellScript "btrfs-nuke-impermanent" ''
-    set -euo pipefail
+  # Streamlined initrd cleanup script
+  initrdNukeScript = ''
+    echo "🚀 Initrd: Starting btrfs impermanence cleanup..."
 
-    echo "🧹 Starting btrfs impermanence cleanup..."
+    # Wait for LUKS device
+    if [ ! -e /dev/mapper/cryptroot ]; then
+        echo "❌ LUKS device not found - trying to open..."
+        cryptsetup luksOpen /dev/disk/by-label/luks cryptroot || {
+            echo "❌ Failed to open LUKS device"
+            exit 1
+        }
+    fi
 
-    # Mount the encrypted btrfs root
-    LUKS_DEV="/dev/mapper/cryptroot"
-    MOUNT_POINT="/mnt/btrfs-root"
+    mkdir -p /mnt-btrfs-root
+    if mount /dev/mapper/cryptroot /mnt-btrfs-root -o subvolid=5,compress=zstd:1; then
+      cd /mnt-btrfs-root
+      timestamp=$(date +%Y%m%d-%H%M%S)
 
-    # Create temporary mount point
-    mkdir -p "$MOUNT_POINT"
+      # Function to safely delete subvolumes
+      delete_subvolume_recursively() {
+          local subvol_path="$1"
+          btrfs subvolume list -o "$subvol_path" 2>/dev/null | cut -f9 -d' ' | while read subvolume; do
+              echo "Deleting nested subvolume: /$subvolume"
+              btrfs subvolume delete "/$subvolume" 2>/dev/null || true
+          done
+          btrfs subvolume delete "$subvol_path" 2>/dev/null || true
+      }
 
-    # Mount the btrfs root (not any subvolume)
-    if ! mount "$LUKS_DEV" "$MOUNT_POINT" -o subvolid=5,compress=zstd:1,ssd,discard=async,space_cache=v2; then
+      # Recreate root subvolume
+      if [[ -d "root" ]]; then
+          echo "🔄 Recreating root subvolume..."
+          btrfs subvolume snapshot root "root-old-$timestamp" 2>/dev/null || true
+          delete_subvolume_recursively "root"
+          btrfs subvolume create root
+          mkdir -p root/{etc,var/tmp,usr,tmp}
+          chmod 1777 root/tmp root/var/tmp
+      else
+          btrfs subvolume create root
+          mkdir -p root/{etc,var/tmp,usr,tmp}
+          chmod 1777 root/tmp root/var/tmp
+      fi
+
+      # Recreate home subvolume
+      if [[ -d "home" ]]; then
+          echo "🔄 Recreating home subvolume..."
+          btrfs subvolume snapshot home "home-old-$timestamp" 2>/dev/null || true
+          delete_subvolume_recursively "home"
+          btrfs subvolume create home
+      else
+          btrfs subvolume create home
+      fi
+
+      # Clean old snapshots (keep last 3)
+      for subvol in root home; do
+          find . -maxdepth 1 -name "$subvol-old-*" -type d 2>/dev/null | sort -r | tail -n +4 | while read old_snapshot; do
+              btrfs subvolume delete "$old_snapshot" 2>/dev/null || true
+          done
+      done
+
+      cd / && umount /mnt-btrfs-root
+      echo "✅ Impermanence setup completed"
+    else
       echo "❌ Failed to mount btrfs root"
       exit 1
     fi
-
-    cd "$MOUNT_POINT"
-
-    # Function to recreate a subvolume
-    recreate_subvolume() {
-      local subvol_name="$1"
-      local backup_suffix="$2"
-
-      echo "🔄 Recreating subvolume: $subvol_name"
-
-      # Create backup snapshot if subvolume exists
-      if [[ -d "$subvol_name" ]]; then
-        echo "  📸 Creating backup snapshot: $subvol_name$backup_suffix"
-        btrfs subvolume snapshot "$subvol_name" "$subvol_name$backup_suffix" || true
-
-        echo "  🗑️  Deleting old subvolume: $subvol_name"
-        btrfs subvolume delete "$subvol_name" || true
-      fi
-
-      echo "  ✨ Creating fresh subvolume: $subvol_name"
-      btrfs subvolume create "$subvol_name"
-
-      # Set appropriate permissions
-      case "$subvol_name" in
-        "home")
-          chmod 755 "$subvol_name"
-          ;;
-        "root")
-          chmod 755 "$subvol_name"
-          ;;
-        *)
-          chmod 755 "$subvol_name"
-          ;;
-      esac
-    }
-
-    # Recreate impermanent subvolumes (keeping nix, persist, log, swap)
-    recreate_subvolume "root" "-old-$(date +%Y%m%d-%H%M%S)"
-    recreate_subvolume "home" "-old-$(date +%Y%m%d-%H%M%S)"
-
-    # Clean up old backup snapshots (keep only last 3)
-    echo "🧹 Cleaning up old snapshots..."
-    find . -maxdepth 1 -name "*-old-*" -type d | sort | head -n -3 | while read -r old_snapshot; do
-      if [[ -n "$old_snapshot" ]]; then
-        echo "  🗑️  Removing old snapshot: $old_snapshot"
-        btrfs subvolume delete "$old_snapshot" 2>/dev/null || true
-      fi
-    done
-
-    # Create essential directories in fresh root subvolume
-    echo "📁 Creating essential directories in fresh root subvolume..."
-
-    # Create basic root filesystem structure
-    mkdir -p root/{etc,var,usr,opt,srv,run,tmp}
-    mkdir -p root/var/{tmp,cache,lib,log,opt,spool}
-    mkdir -p root/usr/{bin,lib,share,local}
-    mkdir -p root/tmp
-    chmod 1777 root/tmp
-    chmod 1777 root/var/tmp
-
-    # Create user directory structure in fresh home subvolume
-    echo "🏠 Setting up user home in fresh home subvolume..."
-    mkdir -p "home/${declarative.username}"
-    chown 1000:100 "home/${declarative.username}" 2>/dev/null || true
-    chmod 700 "home/${declarative.username}" 2>/dev/null || true
-
-    cd /
-    umount "$MOUNT_POINT"
-    rmdir "$MOUNT_POINT"
-
-    echo "✅ Btrfs impermanence cleanup completed!"
-    echo "📊 Fresh subvolumes created - system will be completely clean on next boot"
-  '';
-
-  # Lightweight initrd cleanup script
-  initrdNukeScript = ''
-    echo "🚀 Initrd: Preparing btrfs impermanence cleanup..."
-
-    # Create mount point
-    mkdir -p /mnt-btrfs-root
-
-    # Mount btrfs root filesystem
-    if mount /dev/mapper/cryptroot /mnt-btrfs-root -o subvolid=5,compress=zstd:1; then
-      cd /mnt-btrfs-root
-
-      # Quick cleanup of temporary files
-      if [[ -d "root/tmp" ]]; then
-        rm -rf root/tmp/* 2>/dev/null || true
-      fi
-      if [[ -d "root/var/tmp" ]]; then
-        rm -rf root/var/tmp/* 2>/dev/null || true
-      fi
-
-      # Optionally recreate subvolumes here for even more thorough cleanup
-      # (Uncomment the lines below for full subvolume recreation at boot)
-      #
-      # timestamp=$(date +%Y%m%d-%H%M%S)
-      # if [[ -d "root" ]]; then
-      #   btrfs subvolume snapshot root root-old-$timestamp || true
-      #   btrfs subvolume delete root || true
-      #   btrfs subvolume create root
-      #   mkdir -p root/{etc,var,usr,opt,srv,run,tmp}
-      #   chmod 1777 root/tmp
-      # fi
-      #
-      # if [[ -d "home" ]]; then
-      #   btrfs subvolume snapshot home home-old-$timestamp || true
-      #   btrfs subvolume delete home || true
-      #   btrfs subvolume create home
-      #   mkdir -p home/${declarative.username}
-      # fi
-
-      cd /
-      umount /mnt-btrfs-root
-    fi
-
     rmdir /mnt-btrfs-root 2>/dev/null || true
-    echo "✅ Initrd cleanup completed"
   '';
 in {
   programs.fuse.userAllowOther = true;
@@ -152,9 +82,8 @@ in {
     kernelModules = ["btrfs" "dm-mod" "dm-crypt"];
     extraUtilsCommands = ''
       copy_bin_and_libs ${pkgs.btrfs-progs}/bin/btrfs
+      copy_bin_and_libs ${pkgs.cryptsetup}/bin/cryptsetup
     '';
-
-    # Initrd cleanup - runs before root filesystem switch
     postDeviceCommands = lib.mkAfter initrdNukeScript;
   };
 
@@ -162,6 +91,7 @@ in {
     enable = true;
     hideMounts = true;
     directories = [
+      # System directories
       "/etc/NetworkManager/system-connections"
       "/var/lib/nixos"
       "/var/lib/systemd/coredump"
@@ -171,111 +101,155 @@ in {
         directory = "/etc/ssh";
         mode = "0755";
       }
-
-      # ADD USER DIRECTORIES HERE
-      "/home/${declarative.username}/Downloads"
-      "/home/${declarative.username}/Pictures"
-      "/home/${declarative.username}/Documents"
-      "/home/${declarative.username}/Videos"
-      "/home/${declarative.username}/Desktop"
-      "/home/${declarative.username}/Public"
-      "/home/${declarative.username}/Templates"
-      "/home/${declarative.username}/.gnupg"
-      "/home/${declarative.username}/.local/share/keyrings"
-      "/home/${declarative.username}/.config/git"
-      "/home/${declarative.username}/.zen"
-      "/home/${declarative.username}/.cache/zen"
-      "/home/${declarative.username}/.local/share/applications"
-      "/home/${declarative.username}/.local/share/icons"
-      "/home/${declarative.username}/.config/fontconfig"
-      "/home/${declarative.username}/Games"
-      "/home/${declarative.username}/Game-Mods"
-      "/home/${declarative.username}/Appimages"
     ];
+
+    # User-specific persistence with proper ownership
+    users.${declarative.username} = {
+      directories = [
+        # User data directories
+        "Downloads"
+        "Pictures"
+        "Documents"
+        "Videos"
+        "Desktop"
+        "Public"
+        "Templates"
+        "Games"
+        "Game-Mods"
+        "Appimages"
+
+        # Security & keys (with restrictive permissions)
+        {
+          directory = ".gnupg";
+          mode = "0700";
+        }
+        {
+          directory = ".local/share/keyrings";
+          mode = "0700";
+        }
+
+        # Application configs
+        ".config/git"
+        ".zen"
+        ".mozilla"
+        ".config/BeeperTexts"
+
+        # Desktop environment configs
+        ".config/alacritty"
+        ".config/hypr"
+        ".config/hyprpanel"
+        ".config/hyprshade"
+        ".config/kitty"
+        ".config/mpv"
+        ".config/nemo"
+        ".config/gtk-3.0"
+        ".config/gtk-4.0"
+        {
+          directory = ".config/dconf";
+          mode = "0700";
+        }
+        ".config/fontconfig"
+
+        # Input method configs
+        {
+          directory = ".config/fcitx";
+          mode = "0700";
+        }
+        {
+          directory = ".config/fcitx5";
+          mode = "0700";
+        }
+        {
+          directory = ".config/ibus";
+          mode = "0700";
+        }
+
+        # System integration
+        ".config/systemd"
+        ".config/environment.d"
+        ".local/share/applications"
+        ".local/share/icons"
+
+        # Local directories
+        ".local/share"
+        {
+          directory = ".local/state";
+          mode = "0700";
+        }
+        ".cache"
+
+        # Specific cache directories
+        ".cache/zen"
+        ".cache/kitty"
+      ];
+
+      files = [
+        ".config/user-dirs.dirs"
+        ".config/user-dirs.locale"
+      ];
+    };
+
     files = [
       "/etc/machine-id"
     ];
   };
 
+  # Minimal tmpfiles rules - let impermanence handle most directory creation
   systemd.tmpfiles.rules = [
+    # Only create the base persist directory structure
     "d ${persistPath} 0755 root root -"
     "d ${persistPath}/home 0755 root root -"
-    "d ${persistPath}/home/${declarative.username} 0700 ${declarative.username} users -"
 
-    # Create all subdirectories
-    "d ${persistPath}/home/${declarative.username}/Downloads 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Pictures 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Documents 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Videos 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Desktop 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Public 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Templates 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.gnupg 0700 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.local/share/keyrings 0700 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.config/git 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.zen 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.cache/zen 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.local/share/applications 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.local/share/icons 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/.config/fontconfig 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Games 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Game-Mods 0755 ${declarative.username} users -"
-    "d ${persistPath}/home/${declarative.username}/Appimages 0755 ${declarative.username} users -"
+    # The user home directory itself should be created by the system
+    # but we ensure it has correct permissions
+    "d /home/${declarative.username} 0755 ${declarative.username} users -"
   ];
 
-  # Systemd service for manual/scheduled full cleanup
-  systemd.services.btrfs-nuke-impermanent = {
-    description = "Btrfs subvolume recreation for true impermanence";
+  # Add a systemd service to fix ownership after boot
+  systemd.services.fix-home-permissions = {
+    description = "Fix home directory permissions after impermanence setup";
+    after = ["local-fs.target"];
+    wantedBy = ["multi-user.target"];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${nukeScript}";
-      RemainAfterExit = false;
-      StandardOutput = "journal";
-      StandardError = "journal";
+      RemainAfterExit = true;
     };
+    script = ''
+      # Fix ownership of home directory and immediate subdirectories
+      ${pkgs.coreutils}/bin/chown -R ${declarative.username}:users /home/${declarative.username}
+
+      # Ensure proper permissions for security-sensitive directories
+      if [ -d "/home/${declarative.username}/.gnupg" ]; then
+        ${pkgs.coreutils}/bin/chmod 0700 /home/${declarative.username}/.gnupg
+        ${pkgs.coreutils}/bin/chown -R ${declarative.username}:users /home/${declarative.username}/.gnupg
+      fi
+
+      if [ -d "/home/${declarative.username}/.local/share/keyrings" ]; then
+        ${pkgs.coreutils}/bin/chmod 0700 /home/${declarative.username}/.local/share/keyrings
+        ${pkgs.coreutils}/bin/chown -R ${declarative.username}:users /home/${declarative.username}/.local/share/keyrings
+      fi
+
+      # Fix SSH directory if it exists in home
+      if [ -d "/home/${declarative.username}/.ssh" ]; then
+        ${pkgs.coreutils}/bin/chmod 0700 /home/${declarative.username}/.ssh
+        ${pkgs.coreutils}/bin/chown -R ${declarative.username}:users /home/${declarative.username}/.ssh
+      fi
+    '';
   };
 
-  # Optional: Timer for periodic cleanup (disabled by default)
-  systemd.timers.btrfs-nuke-impermanent = {
-    description = "Periodic btrfs impermanence cleanup";
-    # wantedBy = [ "timers.target" ];  # Uncomment to enable
-    timerConfig = {
-      OnCalendar = "daily";
-      Persistent = true;
-      RandomizedDelaySec = "1h";
-    };
-  };
-
-  # Add manual nuke commands to system packages
+  # Utility commands
   environment.systemPackages = [
-    # Full nuclear option - recreates subvolumes
-    (pkgs.writeShellScriptBin "nuke-system-full" ''
-      echo "💥 NUCLEAR OPTION: This will recreate root and home subvolumes!"
-      echo "⚠️  ALL non-persistent data will be permanently lost!"
-      echo "Press Ctrl+C within 10 seconds to cancel..."
-      sleep 10
-      ${nukeScript}
-      echo ""
-      echo "🔄 Reboot required for changes to take effect"
-      echo "Run: sudo reboot"
-    '')
-
-    # Lighter cleanup option
-    (pkgs.writeShellScriptBin "nuke-system-light" ''
-      echo "🧹 Light cleanup: removing temporary files and caches..."
-      find /tmp -mindepth 1 -delete 2>/dev/null || true
-      find /var/tmp -mindepth 1 -delete 2>/dev/null || true
-      find /home -name ".cache" -type d -exec find {} -mindepth 1 -delete \; 2>/dev/null || true
-      echo "✅ Light cleanup completed!"
-    '')
-
-    # Show subvolume status
     (pkgs.writeShellScriptBin "show-subvolumes" ''
       echo "📊 Current btrfs subvolumes:"
       sudo btrfs subvolume list /
-      echo ""
-      echo "💾 Disk usage by subvolume:"
+      echo -e "\n💾 Disk usage:"
       sudo btrfs fi usage /
+    '')
+
+    (pkgs.writeShellScriptBin "fix-home-perms" ''
+      echo "🔧 Fixing home directory permissions..."
+      sudo chown -R ${declarative.username}:users /home/${declarative.username}
+      echo "✅ Home directory permissions fixed"
     '')
   ];
 

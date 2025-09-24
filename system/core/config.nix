@@ -66,14 +66,6 @@
   # Command not found
   programs.command-not-found.enable = true;
 
-  # Freefall
-  #services.freefall = {
-  # enable = true;
-  #devices = [
-  # "/dev/sda"
-  #];
-  # };
-
   # Yet another nix helper
   programs.nh = {
     enable = true;
