@@ -129,7 +129,7 @@
               flake-inputs = inputs;
             };
 
-            # Add impermanence module to home-manager
+            # Add impermanence module to home-manager.
             sharedModules = [
               impermanence.nixosModules.home-manager.impermanence
             ];
