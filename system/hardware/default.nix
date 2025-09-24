@@ -1,11 +1,8 @@
 {
   imports = [
-    ./disko-luks.nix
-    ./disk-mount.nix
     ./battery.nix
     ./power.nix
     ./tweaks.nix
-    #./impermanence.nix
-    ./nuke-impermanence.nix
+    ./disk-management/default.nix
   ];
 }

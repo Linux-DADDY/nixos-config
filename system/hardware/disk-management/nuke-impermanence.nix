@@ -114,8 +114,6 @@ in {
         "Desktop"
         "Public"
         "Templates"
-        "Games"
-        "Game-Mods"
         "Appimages"
 
         # Security & keys (with restrictive permissions)
@@ -133,6 +131,11 @@ in {
         ".zen"
         ".mozilla"
         ".config/BeeperTexts"
+
+        # Game Directories
+        "Games"
+        "Game-Mods"
+        ".config/heroic"
 
         # Desktop environment configs
         ".config/alacritty"

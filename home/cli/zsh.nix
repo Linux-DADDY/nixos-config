@@ -15,6 +15,8 @@
         "git"
         "sudo"
         "z"
+        "copyfile"
+        "copypath"
       ]; # Minimal plugins only
     };
 

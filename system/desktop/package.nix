@@ -13,6 +13,7 @@
     ])
     ++ (with pkgs-unstable; [
       heroic
+      beeper
       # other unstable packages
     ])
     ++ [

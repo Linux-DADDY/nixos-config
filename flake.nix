@@ -129,10 +129,15 @@
               flake-inputs = inputs;
             };
 
+            # Add impermanence module to home-manager
+            sharedModules = [
+              impermanence.nixosModules.home-manager.impermanence
+            ];
+
             users.${declarative.username} = {
               imports = [
                 ./home/default.nix
-                impermanence.homeManagerModules.impermanence
+                #impermanence.homeManagerModules.impermanence
                 # nix-flatpak.homeManagerModules.nix-flatpak
 
                 # Add Hyprland home-manager module if needed
